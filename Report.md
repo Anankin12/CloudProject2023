@@ -2,31 +2,31 @@
 
 ## Introduction
 
-I used Nextcloud to deploy a local cloud solution using Docker containers. The configuration includes two `Nextcoud` instances with a shared data volume and independet (although identical) configuration files to achieve high reliability, a `MySQL` container as a database, a `Redis` container to implement caching and a `Nginx` container as a reverse proxy and to perform load balancing.  
+I used Nextcloud to deploy a local cloud solution using Docker containers. The configuration includes two `Nextcloud` instances with a shared data volume and independent (although identical) configuration files to achieve high reliability, a `MySQL` container as a database, a `Redis` container to implement caching and a `Nginx` container as a reverse proxy and to perform load balancing.  
 Moreover, a `Locust` container was added to perform load testing.  
 
 The system allows users to sign up, log in, and log out using the integrated Nextcloud UI, thanks to the module Register that can be installed and integrated through the Nextcloud native GUI.  
 
 It is possible to configure roles for new users, such as admin, a user, and a guest, but more roles can be added as needed through the integrated functionality for user management, including having asymmetrical access to resources and functionalities.  
 
-Each user has their own private storage space, which can only be accessed by them or by directly accessing the machine and locating the directories associated with the user. This can be either considered a feature for better control by the sysadmins on how the service is used, or it can be seen as a vulnerability depending on the context. If this is considered a sceurity issue, it could be mitigated by activating the built in encryption method, which makes the files still accessible to the admins but it prevents the content to be read by anyone but the owner of the file. It is possible to configure different maximum upload and storage size limits for each user.  
+Each user has their own private storage space, which can only be accessed by them or by directly accessing the machine and locating the directories associated with the user. This can be either considered a feature for better control by the sysadmins on how the service is used, or it can be seen as a vulnerability depending on the context. If this is considered a sceurity issue, it could be mitigated by activating the built-in encryption method, which keeps the files accessible to the admins but it prevents the content to be read by anyone but the owner of the file. It is possible to configure different maximum upload and storage size limits for each user.  
 
 The project can be scaled by adding more instances running on different machines by configuring the nginx and redis instances accordingly, while the storage can be scaled by implementing the appropriate object filesystem, but even a basic such implementation requires at least 2 disks to work properly, so I wasn't able to implement it on my single disk machine.  
 
-It is possible to implement https:// encryption by using a reverse proxy such as nginx or Apache, by acquiring an SSL certificate for a hostname and configuring the appropriate virtual host; this would allow for secure data and file transmissions.  
+It is possible to implement `HTTPS` encryption by using a reverse proxy such `Apache`, by acquiring an SSL certificate for a hostname and configuring the appropriate virtual host; this would allow for secure data and file transmissions. This has been implemented using `Nexcloud AIO` hosted on my home desktop PC and a DDNS at the domain `https://albtrieste.ddns.net`. However, this is the only step that has not been implemented on the local instance, while it's the only part that instance will be used for in this project.  
 
 User authentication can be further secured by using the built in tools to activate 2FA and other security measures.  
 
 The platform used for this project is Docker Desktop running on WSL2 in a Windows 11 Pro machine equipped with an Intel i5 1340P CPU (4+8 cores), 32 GB of DDR4 memory and a 2TB NVMe PCIe 4.0 SSD.  
 
-Monitoring and managing the system can be achieved directly through the GUI, since systems to do most of the required tasks are either already present or can be easily integrated through the Apps section of the GUI of Nextcloud, including an email server that can be automatized to send reports of unusual activity, high resource usage and regular reports.  
+Monitoring and managing the system can be achieved directly through the systems integrated into Nextcloud and its GUI, by activating the appropriate libraries. These allow for real time monitoring of request load and memory usage, as well as user activity. These tools can be further enhanced by configuring an email server that allow for emergency warning to be issued in case of an emergency.
 
 ## Deployment Plan
 
 ### The Docker Compose file
 
 The deployment plan for the cloud-based file storage system is handled in a docker-compose.yml file, which is included below.  
-It requires Docker and the creation of the correct directories where to place the required volumes.
+It requires Docker and the creation of the correct directories to place the required volumes.
 
 ```yaml
 version: '3.8'
@@ -135,7 +135,7 @@ Here's the breakdown of the docker compose file:
       - nextcloud-network
 ```
 
-* redis: This is the Redis container that will be used for caching in Nextcloud. It is configured to be part of the nextcloud-network, while the configuration is not specified and it will thus sue the default values for everything.  
+* redis: This is the Redis container that will be used for caching in Nextcloud. It is configured to be part of the nextcloud-network, while the configuration is not specified and it will thus use the default values for everything.  
 
 ```yaml
   redis:
@@ -230,11 +230,11 @@ The `nginx.conf` file is reported below. In it, I specify:
 
 * The way the container should handle resources. By setting it to auto, it will automatically parallelize the jobs;  
 * The http configuration, which is itself divided into chunks:  
-  * upstream defines the way the backend should behave, by providing the load balancing algoithm (`least_conn`: new requests will be handled by the instance with the least connections) and the addresses of the instances.  
+  * upstream defines the way the backend should behave, by providing the load balancing algorithm (`least_conn`: new requests will be handled by the instance with the least connections) and the addresses of the instances.  
   * log format defines which information to include in the logs, in this case upstream information; this is unnecessary but can be useful for debugging;  
   * The server configures the port to use, the reverseproxy and other connection parameters.
 
-```nginx
+```php
 worker_processes auto;
 
 events {}
@@ -283,7 +283,7 @@ http {
 
 ### Locustfile.py configuration file
 
-The locust container requires a Python configuration file called locustfile.py. It is placed in the specified directory in the host machine and reported below.  
+The locust container requires a Python configuration file called locustfile.py, which provides instructions on what the locust instance should do and know. It is placed in the specified directory in the host machine and reported below.  
 It defines the test users' credentials and the testing tasks: the uploading of a text files and dummy files of varying sizes. Each uploaded file is expected to be deleted after the upload as a part of the test and for cleanup purposes.  
 
 ```python
@@ -432,7 +432,7 @@ Get-Job | Remove-Job
 
 ### Additional steps
 
-To grant unrestricted access to the locust load tester, some security measures need to be taken off. For example, to grant it full access and bypass the built in security measures of both Nextcloud and nginx, the following command was run:
+To grant unrestricted access to the locust load tester, some security measures need to be turned off. For example, to grant it full access and bypass the built in security measures of both Nextcloud and nginx, the following command was run:
 
 ```shell
 docker exec --user www-data nextcloud_instance php /var/www/html/occ config:system:set trusted_domains 2 --value=nextcloud_instance
@@ -442,7 +442,7 @@ docker exec --user www-data nextcloud_instance1 php /var/www/html/occ config:sys
 
 ```
 
-while an edit to the `configure.php` file found in the `.\config` directory in the host filesystem was performed, by adding the following two lines to it:
+while an edit to the `config.php` file found in the `.\config` directory in the host filesystem was performed, by adding the following two lines to it:
 
 ```php
   'ratelimit.protection.enabled' => false,
@@ -451,7 +451,7 @@ while an edit to the `configure.php` file found in the `.\config` directory in t
 
 This way, the tests won't be considered as attacks and the connections won't be blocked, while at the same time the files will remain accessible.  
 
-In prodcution all of these and other security measures should be implemented, but since this instance is running locally and it's only used for testing purposes, it's not a problem to disable them.  
+In prodcution all of these and other security measures should be implemented, but Since this instance is running locally and is only used for testing purposes, it is not problematic to disable them.  
 
 ### Results
 
@@ -465,11 +465,11 @@ The tests have been run with 30 users, by manually cycling through each test exc
 
 ![Just medium sized files](Images/mb.png "Just medium files")
 
-As shown, the system performed about the same for each load, with some occasional failure. Despite the presence of a log of the encountered errors, it's hard to understand what's causing them. They sometimes seem to coincide with other background tasks starting, but not all of the time - sometimes there will be nothing going on and the task will still fail, while other times it won't fail even under additional load.  
+As shown, the system's performance was similar for each load type, though there were some occasional failures. Despite the presence of a log of the encountered errors, it's hard to understand what's causing them. They sometimes seem to coincide with other background tasks starting, but not all of the time - sometimes there will be nothing going on and the task will still fail, while other times it won't fail even under additional load.  
 
 ![Just big files](Images/gb.png "Just big files")
 
-On the contrary, the performance on big files is extremely poor, both in latency terms (average latency of 1 minute and 30 seconds on a disk capable of sustained sequential write 7 GB/s, 600 MB/s random write, 12 cores and 32 GB of fast memory is not acceptable, since each request should take between 1 and 3 seconds to process) and in requests per second. The reason for such unexpectedly low performance is almost surely to attribute to the Windows/WSL communication overhead. Contrary to the two instance case, the memory usage reported by task manager remained within manageable levels.  
+On the contrary, the performance on big files is extremely poor, both in latency terms (average latency of 1 minute and 30 seconds on a disk capable of sustained sequential write 7 GB/s, 600 MB/s random write, 12 cores and 32 GB of fast memory is not acceptable, since each request should take between 1 and 3 seconds to process) and in requests per second. The reason for such unexpectedly low performance is almost surely to attribute to the communication overhead between Windows and WSL. Contrary to the two instance case, the memory usage reported by task manager remained within manageable levels.  
 To test this hypothesis I should run the same configuration in a native Linux system, but I don't have the time to do that.  
 
 ![Mixed load](Images/mixed.png "Mixed load")
@@ -494,4 +494,4 @@ On the other hand, the response time for the big files climbs beyond the duratio
 
 Seeing that trying to load with the 1 GB files completely broke the test, this time the mixed load test excludes the big file upload task, which result in a test that is no different from the first three: about the same performance but no failures at all.  
   
-It seems that having more instances - even running on the same machine, sharing the same resources - provides better reliability, even if not better peroformance.  
+It seems that having more instances—even running on the same machine and sharing the same resources—provides better reliability, even if not better performance.  
