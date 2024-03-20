@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+
+  nextcloud-db:
+    image: mysql:latest
+    container_name: nextcloud-db
+    environment:
+      MYSQL_ROOT_PASSWORD: your-root-password
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: your-user-password
+    restart: always
+    volumes:
+      - ./db:/var/lib/mysql
+    networks:
+      - nextcloud-network
+
+  redis:
+    image: redis:alpine
+    container_name: nextcloud_redis
+    networks:
+      - nextcloud-network
+
+  nextcloud_instance:
+    image: nextcloud:latest
+    container_name: nextcloud_instance
+    depends_on:
+      - nextcloud-db
+    ports:
+      - "8080:80"
+    volumes:
+      - ./data:/var/www/html/data
+      - ./config:/var/www/html/config
+      - ./apps:/var/www/html/custom_apps
+    environment:
+      - REDIS_HOST=redis
+    networks:
+      - nextcloud-network
+
+  nextcloud_instance1:
+    image: nextcloud:latest
+    container_name: nextcloud_instance1
+    depends_on:
+      - nextcloud-db
+    ports:
+      - "8081:80"
+    volumes:
+      - ./data:/var/www/html/data
+      - ./config1:/var/www/html/config
+      - ./apps1:/var/www/html/custom_apps
+    environment:
+      - REDIS_HOST=redis
+    networks:
+      - nextcloud-network
+
+  locust:
+    image: locustio/locust
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./locust:/mnt/
+    command: -f /mnt/locustfile.py --host http://nextcloud_nginx:80 --users 30 --spawn-rate 5 -t 4m30s
+    networks:
+      - nextcloud-network
+
+  nginx:
+      image: nginx:latest
+      container_name: nextcloud_nginx
+      ports:
+        - "80:80"  # Expose Nginx on port 80
+      volumes:
+        - ./nginx.conf:/etc/nginx/nginx.conf:ro  # Mount your Nginx configuration file
+      depends_on:
+        - nextcloud_instance
+        - nextcloud_instance1
+      networks:
+        - nextcloud-network
+
+networks:
+  nextcloud-network:
+    driver: bridge
